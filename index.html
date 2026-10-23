@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#11161d">
+<title>Health Tracker</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="description" content="Offline progressive-overload workout, protein and body-measurement tracker.">
+
+<style>
+:root{
+  --bg:#11161d; --panel:#1a212b; --panel2:#222b37; --line:#2e3a49;
+  --tx:#e6edf5; --dim:#93a4b8; --accent:#4da3ff; --good:#3fbf7f;
+  --warn:#f0b429; --bad:#f2545b; --radius:10px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--tx);
+  font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  padding-bottom:90px}
+h1,h2,h3{margin:0 0 8px;line-height:1.25}
+h1{font-size:19px}h2{font-size:16px}h3{font-size:14px}
+.wrap{max-width:860px;margin:0 auto;padding:12px}
+header{background:var(--panel);border-bottom:1px solid var(--line);
+  padding:12px;position:sticky;top:0;z-index:20}
+header .wrap{padding:0;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.sub{color:var(--dim);font-size:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:14px;margin-bottom:12px}
+.banner{border-left:4px solid var(--bad);background:#2a1b1e;padding:12px;
+  border-radius:var(--radius);margin-bottom:12px;font-size:13px}
+.banner.warn{border-color:var(--warn);background:#2a2518}
+.banner.ok{border-color:var(--good);background:#16271f}
+.banner b{color:#fff}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--panel);
+  border-top:1px solid var(--line);z-index:30;padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;background:none;border:0;color:var(--dim);padding:11px 2px 13px;
+  font-size:11px;cursor:pointer;font-family:inherit}
+nav button.on{color:var(--accent);box-shadow:inset 0 2px 0 var(--accent)}
+nav button span{display:block;font-size:17px;line-height:1.3}
+button,select,input{font-family:inherit;font-size:15px}
+.btn{background:var(--accent);color:#06121f;border:0;border-radius:8px;padding:11px 16px;
+  font-weight:700;cursor:pointer}
+.btn.sec{background:var(--panel2);color:var(--tx);border:1px solid var(--line);font-weight:600}
+.btn.sm{padding:7px 11px;font-size:13px}
+.btn:active{transform:translateY(1px)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sp{justify-content:space-between}
+input,select{background:var(--panel2);border:1px solid var(--line);color:var(--tx);
+  border-radius:8px;padding:9px}
+input[type=number]{width:72px;text-align:center;font-weight:700;font-size:17px}
+label{font-size:12px;color:var(--dim);display:block;margin-bottom:3px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:7px 5px;border-bottom:1px solid var(--line)}
+th{color:var(--dim);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+.ex{background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);
+  padding:12px;margin-bottom:10px}
+.ex.done{border-color:var(--good)}
+.pill{display:inline-block;background:#0e1620;border:1px solid var(--line);color:var(--dim);
+  border-radius:999px;padding:2px 9px;font-size:11px;margin:2px 4px 2px 0}
+.pill.amrap{background:#3a2a10;border-color:#6b4d14;color:#f3c969}
+.pill.go{background:#13281f;border-color:#235c41;color:#5fd99b}
+.setrow{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:9px}
+.setbox{text-align:center}
+.setbox label{font-size:10px;margin-bottom:2px}
+.amrapbox input{border-color:var(--warn);background:#2a2518}
+.big{font-size:25px;font-weight:800}
+.good{color:var(--good)}.bad{color:var(--bad)}.warnc{color:var(--warn)}.dim{color:var(--dim)}
+.bar{height:9px;background:var(--panel2);border-radius:99px;overflow:hidden;margin:7px 0}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:99px;transition:.3s}
+.bar i.ok{background:var(--good)}.bar i.over{background:var(--warn)}
+.note{font-size:12px;color:var(--dim);margin-top:6px}
+.chg{font-size:12px;padding:7px 9px;border-radius:7px;background:#0e1620;margin-top:7px}
+details{margin-top:8px}summary{cursor:pointer;color:var(--accent);font-size:13px}
+.hide{display:none}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:9px}
+/* ---- chart tokens: validated against surface #1a212b (dark) ---- */
+.viz{--series-1:#3987e5;--series-2:#d95926;--good:#0ca30c;
+  --ink-muted:#898781;--grid:#2c2c2a;--axis:#383835;--ink-2:#c3c2b7;
+  position:relative;margin-top:8px}
+.viz svg{width:100%;height:auto;display:block;overflow:visible}
+.viz .gl{stroke:var(--grid);stroke-width:1}
+.viz .ax{stroke:var(--axis);stroke-width:1}
+.viz .tk{fill:var(--ink-muted);font-size:9px;font-variant-numeric:tabular-nums}
+.viz .ln{fill:none;stroke:var(--series-1);stroke-width:2;
+  stroke-linejoin:round;stroke-linecap:round}
+.viz .pt{fill:var(--series-1);stroke:#1a212b;stroke-width:2}
+.viz .lbl{fill:var(--ink-2);font-size:10px;font-weight:700}
+.viz .tgt{stroke:var(--ink-muted);stroke-width:1;stroke-dasharray:3 3}
+.viz .hit{fill:transparent;cursor:pointer}
+.tip{position:absolute;pointer-events:none;background:#0d0d0d;color:#fff;
+  border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-size:12px;
+  white-space:nowrap;opacity:0;transition:opacity .12s;z-index:5;
+  box-shadow:0 4px 14px rgba(0,0,0,.5)}
+.tip b{font-variant-numeric:tabular-nums}
+.smul{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--tx);
+  border-radius:8px;padding:9px;font-family:ui-monospace,Menlo,monospace;font-size:11px}
+</style>
+</head>
+<body>
+
+<header><div class="wrap">
+  <div><h1>Health Tracker</h1><div class="sub" id="hdr"></div></div>
+  <div style="text-align:right"><div class="big" id="hdrW">—</div><div class="sub">lbs</div></div>
+</div></header>
+
+<div class="wrap">
+  <div id="labBanner"></div>
+  <div id="view"></div>
+</div>
+
+<nav>
+  <button data-t="today" class="on"><span>🏋️</span>Today</button>
+  <button data-t="fuel"><span>🥤</span>Fuel</button>
+  <button data-t="body"><span>📏</span>Body</button>
+  <button data-t="hist"><span>📈</span>History</button>
+  <button data-t="set"><span>⚙️</span>Settings</button>
+</nav>
+
+<script>
+/* ============================================================
+   KEVIN'S HEALTH TRACKER  ·  v1.0  ·  2026-10-23
+   Single file. No dependencies. Data in localStorage.
+   Engine spec: 03 Projects/Health/02 Training/(C) The Program...
+   ============================================================ */
+const KEY='kz_health_v1';
+const RUNGS=['Standard','3-sec eccentric','2-sec pause','1.5 reps','Lengthened partials','Rest-pause'];
+
+/* ---------- EXERCISE LIBRARY — from Kevin's 3 QuickFit posters ----------
+   ref = which poster + section, so he can find the picture on the wall.
+   [id, name, group, ref, lo, hi, unilateral, bodyweight]                  */
+const LIB={};
+function L(id,name,group,ref,lo,hi,uni,bw){LIB[id]={id,name,group,ref,lo,hi,uni:!!uni,bw:!!bw};}
+
+/* CHEST */
+L('benchpress','Bench Press','chest','V1 · Upper',8,15);
+L('inclinepress','Incline Bench Press','chest','V1 · Upper',8,15);
+L('chestfly','Chest Fly','chest','V1 · Upper',10,18);
+L('pushup','Push-Up','chest','V2 · Upper',8,30,0,1);
+L('squeezepress','Chest Squeeze Press','chest','V2 · Upper',10,18);
+L('sahammerpress','Single Arm Hammer Chest Press','chest','V3 · Upper',8,15,1);
+L('sainclinepress','Single Arm Incline Bench Press','chest','V3 · Upper',8,15,1);
+L('revgrippress','Reverse Grip Press','chest','V3 · Upper',10,16);
+/* BACK */
+L('singlearmrow','Single Arm Row','back','V1 · Back',12,20,1);
+L('inclinerow','Incline Row','back','V1 · Back',10,18);
+L('floortraise','Floor T Raise','back','V1 · Back',12,20);
+L('renegaderow','Renegade Row','back','V1 · Back',8,15,1);
+L('seesawrow','Seesaw Row','back','V1 · Back',12,20,1);
+L('bentoverrow','Bent Over Row','back','V2 · Back',12,20);
+L('birddogrow','Bird Dog Row','back','V2 · Back',10,16,1);
+L('tripodrow','Tripod Row','back','V2 · Back',12,20,1);
+L('uprightrow','Upright Row','back','V2 · Back',12,18);
+L('deadrow','Dead Row','back','V3 · Back',10,18);
+L('widerow','Wide Row','back','V3 · Back',12,20);
+L('sareversefly','Single Arm Reverse Fly','back','V3 · Back',15,25,1);
+L('superman','Superman','back','V3 · Back',12,20,0,1);
+L('pullover','Dumbbell Pullover','back','V1 · Upper',12,18);
+L('reversefly','Reverse Fly','back','V1 · Upper',15,25);
+L('shrug','Shoulder Shrug','back','V1 · Upper',15,22);
+L('ytwl','Y T W L','back','V3 · Upper',8,15);
+/* SHOULDERS */
+L('shoulderpress','Shoulder Press','shoulders','V1 · Upper',10,15);
+L('sideraise','Side Raise','shoulders','V1 · Upper',15,25);
+L('frontraise','Alternating Front Raise','shoulders','V1 · Upper',12,20,1);
+L('arnold','Arnold Press','shoulders','V2 · Upper',10,16);
+L('lraise','L Raise','shoulders','V2 · Upper',12,20);
+L('salatraise','Single Arm Lateral Raise','shoulders','V2 · Upper',15,25,1);
+L('althammerpress','Alternating Hammer Shoulder Press','shoulders','V3 · Upper',10,16,1);
+L('hammergrippress','Hammer Grip Shoulder Press','shoulders','V3 · Upper',10,16);
+L('sashoulderpress','Single Arm Shoulder Press','shoulders','V3 · Upper',8,14,1);
+/* BICEPS */
+L('hammercurl','Hammer Curl','biceps','V1 · Upper',12,18);
+L('gripcurl','Grip Curl','biceps','V1 · Upper',10,16);
+L('concentration','Concentration Curl','biceps','V1 · Upper',12,16,1);
+L('wristcurl','Wrist Curl','biceps','V1 · Upper',15,25);
+L('altcurl','Alternating Curl','biceps','V2 · Upper',10,16,1);
+L('zottman','Zottman Curl','biceps','V2 · Upper',10,16);
+L('inclinecurl','Seated Incline Curl','biceps','V2 · Upper',10,15);
+L('nomoneycurl','No Money Curl','biceps','V2 · Upper',12,18);
+L('outsidecurl','Outside Bicep Curl','biceps','V3 · Upper',10,16);
+L('reversecurl','Reverse Curl','biceps','V3 · Upper',12,18);
+/* TRICEPS */
+L('tricepext','Tricep Extension','triceps','V1 · Upper',12,16);
+L('kickback','Tricep Kickback','triceps','V1 · Upper',12,20,1);
+L('skullcrusher','Skull Crusher','triceps','V2 · Upper',12,20);
+L('satricepext','Single Arm Tricep Extension','triceps','V2 · Upper',12,18,1);
+L('f2btricep','Front-to-Back Single Arm Tricep Extension','triceps','V3 · Back',12,18,1);
+/* LEGS */
+L('squat','Squat','legs','V1 · Lower',15,25);
+L('goblet','Goblet Squat','legs','V1 · Lower',15,25);
+L('sumo','Sumo Squat','legs','V1 · Lower',15,25);
+L('rdl','Romanian Deadlift','legs','V1 · Lower',12,20);
+L('glutebridge','Glute Bridge','legs','V1 · Lower',15,25);
+L('revlunge','Reverse Lunge','legs','V1 · Lower',10,18,1);
+L('sidelunge','Side Lunge','legs','V1 · Lower',10,18,1);
+L('stepup','Step-Up','legs','V1 · Lower',10,16,1);
+L('calfraise','Calf Raise','legs','V1 · Lower',15,25);
+L('bulgarian','Bulgarian Lunge','legs','V2 · Lower',8,15,1);
+L('elevrevlunge','Elevated Reverse Lunge','legs','V2 · Lower',10,16,1);
+L('curtsy','Curtsy Lunge','legs','V2 · Lower',10,18,1);
+L('cossack','Cossack Squat','legs','V2 · Lower',8,15,1);
+L('frogpump','Frog Pump','legs','V2 · Lower',15,25);
+L('hamcurl','Hamstring Curl','legs','V2 · Lower',12,20);
+L('legext','Leg Extension','legs','V2 · Lower',12,20);
+L('sldl','Single Leg Deadlift','legs','V2 · Lower',10,16,1);
+L('frontsquat','Front Squat','legs','V3 · Lower',12,20);
+L('goodmorning','Good Morning','legs','V3 · Lower',12,20);
+L('slcalf','Single Leg Calf Raise','legs','V3 · Lower',15,25,1);
+L('slglute','Single Leg Glute Bridge','legs','V3 · Lower',12,20,1);
+L('slhipthrust','Single Leg Hip Thrust','legs','V3 · Lower',12,20,1);
+/* CORE */
+L('sidebend','Side Bend','core','V1 · Core',15,25,1);
+L('russian','Russian Twist','core','V1 · Core',15,30);
+L('vup','V-Up','core','V1 · Core',10,20,0,1);
+L('bowext','Bow Extension','core','V1 · Core',12,20);
+L('abrollout','Ab Roll Out','core','V2 · Core',8,15);
+L('hollowfly','Hollow Fly','core','V2 · Core',10,18);
+L('weightedcrunch','Weighted Crunch','core','V3 · Core',12,20);
+L('kneeraise45','45-Degree Weighted Knee Raise','core','V3 · Core',10,18);
+L('plank','Plank (seconds)','core','— hold',30,75,0,1);
+/* TOTAL BODY */
+L('farmerswalk',"Farmer's Walk",'total','V1 · Total',30,60);
+L('swing','Swing','total','V1 · Total',15,25);
+L('thruster','Thruster','total','V1 · Total',10,18);
+L('woodchop','Woodchop','total','V1 · Total',12,20,1);
+L('plankt','Plank T','total','V1 · Total',10,18);
+L('highpull','High Pull','total','V2 · Total',12,18);
+
+/* ---------- DEFAULT PROGRAM (from the written plan) ---------- */
+const DAYS={
+ 1:{name:'Upper Push',ex:[
+   ['inclinepress',4,8,25],['pushup',3,10,'BW'],['shoulderpress',3,10,20],
+   ['sideraise',3,15,10],['tricepext',3,12,25],['skullcrusher',2,12,15]]},
+ 2:{name:'Lower + Core',ex:[
+   ['bulgarian',3,8,20],['rdl',4,12,25],['goblet',3,15,25],
+   ['stepup',2,10,20],['slcalf',3,15,25],['russian',3,15,10]]},
+ 3:{name:'Upper Pull',ex:[
+   ['inclinerow',4,10,25],['singlearmrow',3,12,25],['pullover',3,12,20],
+   ['reversefly',3,15,10],['altcurl',3,10,20],['hammercurl',3,12,20]]},
+ 4:{name:'Arms & Shoulders',ex:[
+   ['inclinecurl',3,10,15],['zottman',3,10,20],['concentration',2,12,15],
+   ['pushup',3,10,'BW'],['tricepext',3,12,25],['arnold',2,12,15],
+   ['sideraise',3,15,10],['bulgarian',2,12,20]]}
+};
+
+/* ---------- STATE ---------- */
+const BLANK={
+  settings:{dbs:[5,10,15,20,25],pullupBar:false,bands:false,phase0:true,
+            proteinTarget:100,waterTarget:100,labBooked:false,startDate:today()},
+  prog:{}, sessions:[], fuel:{}, body:[]
+};
+let S=load();
+function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function load(){try{const r=localStorage.getItem(KEY);if(r){const p=JSON.parse(r);
+  return Object.assign(JSON.parse(JSON.stringify(BLANK)),p);}}catch(e){}
+  const s=JSON.parse(JSON.stringify(BLANK));initProg(s);return s;}
+function initProg(s){s.prog={};for(const d in DAYS){s.prog[d]=DAYS[d].ex.map(([id,sets,T,load])=>
+  ({id,sets,T,load,rung:0}));}}
+function save(){localStorage.setItem(KEY,JSON.stringify(S));}
+if(!S.prog||!Object.keys(S.prog).length){initProg(S);save();}
+
+/* ---------- PROGRESSION ENGINE ---------- */
+function dbs(){return S.settings.dbs.slice().sort((a,b)=>a-b);}
+function stepUp(w){const a=dbs();const i=a.indexOf(w);return (i>=0&&i<a.length-1)?a[i+1]:null;}
+function stepDown(w){const a=dbs();const i=a.indexOf(w);return i>0?a[i-1]:null;}
+
+function engine(p,reps){
+  const ex=LIB[p.id], T=p.T, R=reps[reps.length-1], prior=reps.slice(0,-1);
+  const out={T:p.T,load:p.load,rung:p.rung||0,msgs:[],flag:null};
+  if(S.settings.phase0){out.msgs.push('Phase 0 — engine paused, nothing adjusted.');return out;}
+  const bw=(p.load==='BW'), d=R-T;
+  const missed=prior.filter(r=>r<T).length;
+
+  /* IMPORTANT: working sets stop AT target, so the final set is the most fatigued.
+     A final set below target is NORMAL and must never, on its own, drop the load —
+     otherwise loads walk downward while Kevin is actually succeeding.
+     Load only comes down when the working sets ALSO failed. */
+  if(missed>=2 && d<=-3){
+    const dn=bw?null:stepDown(p.load);
+    if(dn){out.load=dn;out.T=ex.lo;out.flag='under';
+      out.msgs.push('Genuinely too heavy — missed '+missed+' working sets AND faded badly. Load down to '+dn+' lb.');}
+    else{out.T=Math.max(ex.lo,T-2);out.flag='under';
+      out.msgs.push('Too heavy at minimum load — target down to '+out.T+'.');}
+    return out;
+  }
+  if(missed>=2){
+    out.flag='under';
+    out.msgs.push('⚠ Missed target on '+missed+' working sets but the last set held up. Holding load, drop a set. Check protein and sleep.');
+    return out;
+  }
+  /* Working sets landed — the load is proven. Only the final set decides direction. */
+  if(d<=-3){
+    out.flag='fatigue';
+    out.msgs.push('Working sets hit, but the final set faded to '+R+'. Load stays — it is not too heavy. Drop one set next time and check recovery.');
+  } else if(d<=-1){
+    out.msgs.push('Normal end-of-session fatigue. Load and target hold at '+T+'.');
+  } else if(d<=1){
+    out.T=T+1;out.msgs.push('On target — next time aim for '+out.T+'.');
+  } else if(d<=3){
+    out.T=T+2;out.msgs.push('Easy — jumping target to '+out.T+'.');
+  } else {
+    const up=bw?null:stepUp(p.load);
+    if(up){out.load=up;out.T=ex.lo;out.msgs.push('Far too light — up to '+up+' lb, reps reset to '+ex.lo+'.');}
+    else {out.T=T+3;out.msgs.push('Far too light — target to '+out.T+'.');}
+  }
+  // Top of range reached
+  if(out.T>ex.hi){
+    const up=bw?null:stepUp(out.load);
+    if(up&&d>=2){out.load=up;out.T=ex.lo;out.msgs.push('Top of rep range — load up to '+up+' lb, reps reset.');}
+    else if(!up){
+      if(out.rung<RUNGS.length-1){out.rung++;out.T=ex.lo;
+        out.msgs.push('🔧 At max load and top of range → technique rung: '+RUNGS[out.rung]+'. Reps reset to '+ex.lo+'.');}
+      else{out.T=ex.hi;out.flag='outgrown';
+        out.msgs.push('⭐ BUY TRIGGER — max load, top of range, ladder exhausted. This exercise has outgrown the equipment.');}
+    } else out.T=ex.hi;
+  }
+  return out;
+}
+function e1rm(load,reps){return load==='BW'?null:+(load*(1+reps/30)).toFixed(1);}
+
+/* ---------- HELPERS ---------- */
+const $=s=>document.querySelector(s);
+function esc(t){return String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function lastFor(id){for(let i=S.sessions.length-1;i>=0;i--){
+  const e=S.sessions[i].entries.find(x=>x.id===id);if(e)return{...e,date:S.sessions[i].date};}return null;}
+function weekOf(ds){const d=new Date(S.settings.startDate),n=new Date(ds);
+  return Math.floor((n-d)/6048e5)+1;}
+
+/* ============================================================
+   CHARTS — hand-rolled SVG, no libraries.
+   Palette validated for the dark surface #1a212b (all checks pass).
+   Rules held to: one measure per chart (never a dual axis) · single
+   series needs no legend (the title names it) · thin 2px marks ·
+   recessive grid · selective direct labels (latest point only) ·
+   hover tooltip on every plot · the History/Body tables are the
+   table view, so identity is never carried by color alone.
+   ============================================================ */
+const VZ={W:340,H:150,l:36,r:12,t:14,b:22};
+function pad2(lo,hi,t){if(t!=null){lo=Math.min(lo,t);hi=Math.max(hi,t);}
+  if(lo===hi){lo-=1;hi+=1;} const p=(hi-lo)*0.15;return [lo-p,hi+p];}
+function fmt(n){return (Math.round(n*10)/10).toString();}
+function md(d){return d.slice(5).replace('-','/');}
+
+/* Single-series line chart. pts = [{d:'YYYY-MM-DD', v:Number}] */
+function svgLine(pts,o){
+  o=o||{};
+  if(!pts||pts.length<2)
+    return `<div class="note dim">${o.empty||'Two entries needed before this charts.'}</div>`;
+  const {W,H,l,r,t,b}=VZ, pw=W-l-r, ph=H-t-b;
+  let [lo,hi]=pad2(Math.min(...pts.map(p=>p.v)),Math.max(...pts.map(p=>p.v)),o.target);
+  const X=i=>l+(i/(pts.length-1))*pw, Y=v=>t+ph-((v-lo)/(hi-lo))*ph;
+  let g='';
+  for(let i=0;i<3;i++){const v=lo+(hi-lo)*i/2,y=Y(v);
+    g+=`<line class="gl" x1="${l}" y1="${y.toFixed(1)}" x2="${l+pw}" y2="${y.toFixed(1)}"/>
+        <text class="tk" x="${l-5}" y="${(y+3).toFixed(1)}" text-anchor="end">${fmt(v)}</text>`;}
+  if(o.target!=null){const y=Y(o.target);
+    g+=`<line class="tgt" x1="${l}" y1="${y.toFixed(1)}" x2="${l+pw}" y2="${y.toFixed(1)}"/>
+        <text class="tk" x="${l+pw}" y="${(y-4).toFixed(1)}" text-anchor="end">${o.targetLabel||'target'}</text>`;}
+  const dpath=pts.map((p,i)=>`${i?'L':'M'}${X(i).toFixed(1)},${Y(p.v).toFixed(1)}`).join(' ');
+  const last=pts[pts.length-1];
+  let marks='';
+  pts.forEach((p,i)=>{const x=X(i),y=Y(p.v);
+    marks+=`<circle class="pt" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4"/>`+
+      `<rect class="hit" x="${(x-11).toFixed(1)}" y="${t}" width="22" height="${ph}"
+        data-tip="${p.d} — ${fmt(p.v)}${o.unit?' '+o.unit:''}"/>`;});
+  const lx=X(pts.length-1), ly=Y(last.v);
+  const lblAnchor = lx>l+pw-30?'end':'middle';
+  return `<div class="viz"><svg viewBox="0 0 ${W} ${H}" role="img"
+      aria-label="${o.title||'trend'}: ${pts.map(p=>p.d+' '+fmt(p.v)).join(', ')}">
+    ${g}<line class="ax" x1="${l}" y1="${t+ph}" x2="${l+pw}" y2="${t+ph}"/>
+    <path class="ln" d="${dpath}"/>${marks}
+    <text class="lbl" x="${lx.toFixed(1)}" y="${(ly-10).toFixed(1)}" text-anchor="${lblAnchor}">${fmt(last.v)}</text>
+    <text class="tk" x="${l}" y="${H-6}">${md(pts[0].d)}</text>
+    <text class="tk" x="${l+pw}" y="${H-6}" text-anchor="end">${md(last.d)}</text>
+  </svg><div class="tip"></div></div>`;
+}
+
+/* Bar chart vs a target. rows = [{d, v}] */
+function svgBars(rows,o){
+  o=o||{};
+  if(!rows||!rows.length)return `<div class="note dim">${o.empty||'Nothing logged yet.'}</div>`;
+  const {W,H,l,r,t,b}=VZ, pw=W-l-r, ph=H-t-b;
+  let [lo,hi]=[0,Math.max(...rows.map(x=>x.v),o.target||0)*1.15||1];
+  const Y=v=>t+ph-((v-lo)/(hi-lo))*ph;
+  const slot=pw/rows.length, bw=Math.max(3,slot-2); /* 2px surface gap between bars */
+  let g='';
+  for(let i=0;i<3;i++){const v=lo+(hi-lo)*i/2,y=Y(v);
+    g+=`<line class="gl" x1="${l}" y1="${y.toFixed(1)}" x2="${l+pw}" y2="${y.toFixed(1)}"/>
+        <text class="tk" x="${l-5}" y="${(y+3).toFixed(1)}" text-anchor="end">${Math.round(v)}</text>`;}
+  let bars='';
+  rows.forEach((row,i)=>{
+    const x=l+i*slot+(slot-bw)/2, y=Y(row.v), h=Math.max(0,t+ph-y);
+    const met=o.target!=null&&row.v>=o.target;
+    const rr=Math.min(4,bw/2,h);
+    const p=h<=0?'':`M${x},${t+ph} L${x},${(y+rr)} Q${x},${y} ${x+rr},${y}
+      L${x+bw-rr},${y} Q${x+bw},${y} ${x+bw},${(y+rr)} L${x+bw},${t+ph} Z`;
+    bars+=`${p?`<path d="${p}" fill="${met?'var(--good)':'var(--series-1)'}" opacity="${met?1:.55}"/>`:''}
+      <rect class="hit" x="${x.toFixed(1)}" y="${t}" width="${bw.toFixed(1)}" height="${ph}"
+        data-tip="${row.d} — ${fmt(row.v)}${o.unit?' '+o.unit:''}${met?' ✓ target met':''}"/>`;});
+  let tg='';
+  if(o.target!=null){const y=Y(o.target);
+    tg=`<line class="tgt" x1="${l}" y1="${y.toFixed(1)}" x2="${l+pw}" y2="${y.toFixed(1)}"/>
+        <text class="tk" x="${l+pw}" y="${(y-4).toFixed(1)}" text-anchor="end">${o.targetLabel||'target'}</text>`;}
+  const lastRow=rows[rows.length-1];
+  return `<div class="viz"><svg viewBox="0 0 ${W} ${H}" role="img"
+      aria-label="${o.title||'daily'}: ${rows.map(x=>x.d+' '+fmt(x.v)).join(', ')}">
+    ${g}${bars}${tg}<line class="ax" x1="${l}" y1="${t+ph}" x2="${l+pw}" y2="${t+ph}"/>
+    <text class="tk" x="${l}" y="${H-6}">${md(rows[0].d)}</text>
+    <text class="tk" x="${l+pw}" y="${H-6}" text-anchor="end">${md(lastRow.d)}</text>
+  </svg><div class="tip"></div></div>`;
+}
+
+/* Hover layer — crosshair-free but real: nearest-mark tooltip, pointer + touch. */
+function wireCharts(){
+  document.querySelectorAll('.viz').forEach(v=>{
+    const tip=v.querySelector('.tip');if(!tip)return;
+    v.querySelectorAll('.hit').forEach(h=>{
+      const show=e=>{
+        const vb=v.getBoundingClientRect(), hb=h.getBoundingClientRect();
+        tip.textContent=h.dataset.tip;tip.style.opacity=1;
+        let x=hb.left-vb.left+hb.width/2-tip.offsetWidth/2;
+        x=Math.max(0,Math.min(x,vb.width-tip.offsetWidth));
+        tip.style.left=x+'px';
+        tip.style.top=Math.max(0,hb.top-vb.top-tip.offsetHeight-6)+'px';};
+      h.addEventListener('mouseenter',show);
+      h.addEventListener('touchstart',show,{passive:true});
+      h.addEventListener('mouseleave',()=>tip.style.opacity=0);
+    });
+    v.addEventListener('mouseleave',()=>tip.style.opacity=0);
+  });
+}
+
+/* ---------- RENDER ---------- */
+let TAB='today', dayPick=null;
+/* Reps autosave to a draft as they are typed, so a closed tab / sleeping phone
+   mid-workout loses nothing. The draft is cleared when the session is saved. */
+function draftReps(){
+  return (S.draft&&S.draft.date===today()&&S.draft.day===dayPick)?S.draft.reps:{};}
+function noteDraft(i,s,val){
+  if(!S.draft||S.draft.date!==today()||S.draft.day!==dayPick)
+    S.draft={date:today(),day:dayPick,reps:{}};
+  if(val==='')delete S.draft.reps[i+'_'+s]; else S.draft.reps[i+'_'+s]=val;
+  save();}
+function clearDraft(){delete S.draft;save();}
+function backToDays(){dayPick=null;window.scrollTo(0,0);render();}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  /* Tapping "Today" while already inside a day returns to the day list. */
+  if(b.dataset.t==='today'&&TAB==='today'&&dayPick!==null){backToDays();return;}
+  TAB=b.dataset.t;document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
+  window.scrollTo(0,0);render();});
+
+function render(){
+  const w=S.body.length?S.body[S.body.length-1].weight:null;
+  $('#hdrW').textContent=w?w:'—';
+  $('#hdr').textContent='Week '+weekOf(today())+(S.settings.phase0?' · ⚠ Phase 0':'')+' · '+today();
+  $('#labBanner').innerHTML = S.settings.labBooked?'':
+    `<div class="banner"><b>🔴 LAB RETEST OUTSTANDING.</b><br>
+     Kidney panel needs repeating. Ask for <b>cystatin C</b> alongside creatinine + eGFR — it measures
+     filtration independently of creatine intake and muscle mass.<br>
+     <span class="dim">Protein target here is a holding value, not the muscle-building target. Sauna ramp is suspended.</span><br>
+     <button class="btn sm sec" style="margin-top:8px" onclick="S.settings.labBooked=true;save();render()">Mark retest booked</button></div>`;
+  $('#view').innerHTML={today:vToday,fuel:vFuel,body:vBody,hist:vHist,set:vSet}[TAB]();
+  if(TAB==='today')wireToday();
+  wireCharts();
+}
+
+/* ---------- TODAY ---------- */
+function vToday(){
+  if(dayPick===null){
+    const last=S.sessions.length?S.sessions[S.sessions.length-1]:null;
+    const sug=last?(+last.day%4)+1:1;
+    const dft=(S.draft&&S.draft.date===today())?S.draft:null;
+    return (dft?`<div class="banner warn"><b>⚠ Unfinished session — Day ${dft.day}, ${DAYS[dft.day].name}.</b>
+      ${Object.keys(dft.reps).length} set(s) logged but not saved, so nothing has adjusted yet.
+      <button class="btn sm" style="margin-top:8px" onclick="dayPick=${dft.day};render()">Resume</button>
+      <button class="btn sm sec" style="margin-top:8px" onclick="if(confirm('Discard the unsaved sets?')){clearDraft();render()}">Discard</button>
+      </div>`:'')+
+      `<div class="card"><h2>Pick today's session</h2>
+      <div class="note">Suggested next: <b>Day ${sug} — ${DAYS[sug].name}</b></div>
+      <div class="grid2" style="margin-top:10px">`+
+      Object.keys(DAYS).map(d=>`<button class="btn ${d==sug?'':'sec'}" onclick="dayPick=${d};render()">
+        Day ${d}<br><span style="font-weight:400;font-size:12px">${DAYS[d].name}</span></button>`).join('')+
+      `</div></div>`+
+      (S.settings.phase0?`<div class="banner warn"><b>⚠ Phase 0 is ON (weeks 1–2).</b>
+        Stop every set 3–4 reps short of failure. Run one fewer set than listed. The engine is paused —
+        nothing will adjust. Turn it off in Settings when week 3 starts.</div>`:'')+
+      `<div class="card"><h3>Rest days</h3><div class="note">Wed / Sat / Sun — walk or ruck 30–50 min.
+        Loaded carries cover VO2max and bone density; lifting doesn't.</div></div>`;
+  }
+  const d=dayPick, prog=S.prog[d];
+  const nDraft=Object.keys(draftReps()).length;
+  return `<button class="btn sec" style="width:100%;margin-bottom:10px;text-align:left"
+      onclick="backToDays()">← &nbsp;All days</button>
+    <div class="card"><div class="row sp"><div><h2>Day ${d} — ${DAYS[d].name}</h2>
+    <div class="sub">${prog.length} exercises · final set to failure</div></div>
+    <button class="btn sec sm" onclick="backToDays()">Switch day</button></div></div>`+
+    (nDraft?`<div class="banner ok"><b>✅ ${nDraft} set${nDraft>1?'s':''} saved as you typed.</b>
+      Close the tab, lock the phone, come back later — it'll still be here.
+      Nothing counts toward progression until you hit <b>Save session</b> at the bottom.</div>`:'')+
+    prog.map((p,i)=>exCard(p,i)).join('')+
+    `<div class="card"><label>Session note (optional)</label>
+     <input id="snote" style="width:100%" placeholder="energy, sleep, soreness…">
+     <button class="btn" style="width:100%;margin-top:10px" onclick="saveSession()">Save session &amp; adjust</button></div>`;
+}
+function exCard(p,i){
+  const ex=LIB[p.id], last=lastFor(p.id), dr=draftReps();
+  const sets=Math.max(1,S.settings.phase0?p.sets-1:p.sets);
+  let boxes='';
+  for(let s=0;s<sets;s++){
+    const amrap=(s===sets-1)&&!S.settings.phase0;
+    const v=dr[i+'_'+s]!==undefined?dr[i+'_'+s]:'';
+    boxes+=`<div class="setbox ${amrap?'amrapbox':''}">
+      <label>${amrap?'FAILURE':'Set '+(s+1)}</label>
+      <input type="number" inputmode="numeric" data-ex="${i}" data-set="${s}"
+        value="${v}" oninput="noteDraft(${i},${s},this.value)"
+        placeholder="${amrap?'?':p.T}"></div>`;
+  }
+  return `<div class="ex" id="ex${i}">
+    <div class="row sp"><div><h3>${esc(ex.name)}</h3>
+      <span class="pill">${ex.ref}</span>
+      ${ex.uni?'<span class="pill">per side</span>':''}
+      ${p.rung>0?`<span class="pill go">🔧 ${RUNGS[p.rung]}</span>`:''}
+    </div><div style="text-align:right">
+      <div class="big">${p.load==='BW'?'BW':p.load+'<span style="font-size:13px"> lb</span>'}</div>
+      <div class="sub">${sets} × ${p.T}${S.settings.phase0?'':' + AMRAP'}</div></div></div>
+    ${last?`<div class="note">Last ${last.date}: ${last.reps.join(' · ')} @ ${last.load==='BW'?'BW':last.load+' lb'}${
+       last.e1rm?` · e1RM ${last.e1rm}`:''}</div>`:'<div class="note dim">No history yet.</div>'}
+    <div class="setrow">${boxes}</div>
+    <details><summary>Swap exercise</summary>
+      <select onchange="swap(${i},this.value)" style="width:100%;margin-top:7px">
+        <option value="">— same muscle group (${ex.group}) —</option>
+        ${Object.values(LIB).filter(x=>x.group===ex.group&&x.id!==ex.id)
+          .map(x=>`<option value="${x.id}">${esc(x.name)} · ${x.ref}</option>`).join('')}
+      </select></details></div>`;
+}
+function wireToday(){}
+function swap(i,id){if(!id)return;const p=S.prog[dayPick][i];
+  p.id=id;p.T=LIB[id].lo;p.rung=0;save();render();}
+
+function saveSession(){
+  const d=dayPick,prog=S.prog[d],entries=[],changes=[];
+  for(let i=0;i<prog.length;i++){
+    const inputs=[...document.querySelectorAll(`input[data-ex="${i}"]`)];
+    const reps=inputs.map(x=>parseInt(x.value,10)).filter(v=>!isNaN(v)&&v>=0);
+    if(reps.length!==inputs.length)continue;
+    const p=prog[i],ex=LIB[p.id],R=reps[reps.length-1];
+    const res=engine(p,reps);
+    entries.push({id:p.id,name:ex.name,load:p.load,T:p.T,reps,e1rm:e1rm(p.load,R),rung:p.rung});
+    changes.push({name:ex.name,msgs:res.msgs,flag:res.flag,
+      from:`${p.load==='BW'?'BW':p.load+' lb'} × ${p.T}`,
+      to:`${res.load==='BW'?'BW':res.load+' lb'} × ${res.T}`});
+    p.T=res.T;p.load=res.load;p.rung=res.rung;
+  }
+  if(!entries.length){alert('Enter reps for at least one complete exercise.');return;}
+  const note=($('#snote')||{}).value||'';
+  S.sessions.push({date:today(),day:d,entries,note});clearDraft();save();
+  const wk=weekOf(today());
+  $('#view').innerHTML=`<div class="banner ok"><b>✅ Session saved — Day ${d}, ${DAYS[d].name}</b><br>
+    ${entries.length} exercises logged.</div>`+
+    (wk>0&&wk%6===0?`<div class="banner warn"><b>Week ${wk} — deload week.</b>
+      Keep the loads, cut sets ~40%, stop 3–4 reps short.</div>`:'')+
+    `<div class="card"><h2>Next session's prescription</h2>`+
+    changes.map(c=>`<div class="chg"><b>${esc(c.name)}</b> &nbsp;<span class="dim">${c.from} → </span>
+      <b class="${c.flag==='under'?'warnc':(c.flag==='outgrown'?'good':'')}">${c.to}</b>
+      <div class="note">${c.msgs.map(esc).join('<br>')}</div></div>`).join('')+
+    `<button class="btn" style="width:100%;margin-top:12px" onclick="dayPick=null;render()">Done</button></div>`;
+  window.scrollTo(0,0);
+}
+
+/* ---------- FUEL ---------- */
+function vFuel(){
+  const t=today(),f=S.fuel[t]||{p:0,w:0};
+  const pt=S.settings.proteinTarget,wt=S.settings.waterTarget;
+  const pp=Math.min(100,f.p/pt*100),wp=Math.min(100,f.w/wt*100);
+  const days=Object.keys(S.fuel).sort().slice(-7).reverse();
+  return `<div class="banner"><b>⚠ Protein target is a HOLDING VALUE.</b>
+    Set to ${pt} g pending the kidney retest — <b>not</b> a muscle-building target.
+    With reduced kidney function, protein is typically restricted rather than raised.
+    <b>The real number comes from your provider, not this app.</b></div>
+  <div class="card"><div class="row sp"><h2>Protein</h2>
+    <div><span class="big ${f.p>=pt?'good':''}">${f.p}</span><span class="dim"> / ${pt} g</span></div></div>
+    <div class="bar"><i class="${f.p>=pt?'ok':''}" style="width:${pp}%"></i></div>
+    <div class="row">${[10,20,25,40,50,60].map(n=>
+      `<button class="btn sec sm" onclick="addP(${n})">+${n}</button>`).join('')}
+      <button class="btn sec sm" onclick="addP(-10)">−10</button>
+      <button class="btn sec sm" onclick="setP(0)">reset</button></div>
+    <div class="note">Shake (2 scoops + milk + oats + PB) ≈ 60 g · 6 oz chicken ≈ 40 g ·
+      1 cup cottage cheese ≈ 25 g · egg ≈ 6 g</div></div>
+
+  <div class="card"><div class="row sp"><h2>Water</h2>
+    <div><span class="big ${f.w>=wt?'good':''}">${f.w}</span><span class="dim"> / ${wt} oz</span></div></div>
+    <div class="bar"><i class="${f.w>=wt?'ok':''}" style="width:${wp}%"></i></div>
+    <div class="row">${[8,12,16,20,32].map(n=>
+      `<button class="btn sec sm" onclick="addW(${n})">+${n}</button>`).join('')}
+      <button class="btn sec sm" onclick="addW(-8)">−8</button>
+      <button class="btn sec sm" onclick="setW(0)">reset</button></div>
+    <div class="note">⚠ Hydration matters more than usual right now — dehydration is one of the
+      leading explanations for the July creatinine.</div></div>
+
+  <div class="card"><h2>Protein — last 14 days</h2>
+    <div class="sub">Green bars cleared the ${pt} g floor.</div>
+    ${svgBars(Object.keys(S.fuel).sort().slice(-14).map(d=>({d,v:S.fuel[d].p})),
+      {target:pt,targetLabel:pt+' g floor',unit:'g',title:'Daily protein',
+       empty:'Log a day or two and the trend shows up here.'})}
+    <div class="note">Consistency is the point — one big day does not offset three empty ones.</div></div>
+
+  <div class="card"><h2>Water — last 14 days</h2>
+    ${svgBars(Object.keys(S.fuel).sort().slice(-14).map(d=>({d,v:S.fuel[d].w})),
+      {target:wt,targetLabel:wt+' oz',unit:'oz',title:'Daily water'})}</div>
+
+  <div class="card"><h2>Last 7 logged days</h2><table><tr><th>Date</th><th>Protein</th><th>Water</th></tr>
+    ${days.map(d=>{const x=S.fuel[d];return `<tr><td>${d}</td>
+      <td class="${x.p>=pt?'good':'bad'}">${x.p} g</td><td>${x.w} oz</td></tr>`;}).join('')||
+      '<tr><td colspan="3" class="dim">Nothing logged yet.</td></tr>'}</table></div>`;
+}
+function fz(){const t=today();if(!S.fuel[t])S.fuel[t]={p:0,w:0};return S.fuel[t];}
+function addP(n){const f=fz();f.p=Math.max(0,f.p+n);save();render();}
+function setP(n){fz().p=n;save();render();}
+function addW(n){const f=fz();f.w=Math.max(0,f.w+n);save();render();}
+function setW(n){fz().w=n;save();render();}
+
+/* ---------- BODY ---------- */
+function vBody(){
+  const b=S.body.slice().reverse(),F=['weight','waist','armL','armR','chest','thigh'];
+  const N={weight:'Weight (lb)',waist:'Waist (in)',armL:'Arm L (in)',armR:'Arm R (in)',
+           chest:'Chest (in)',thigh:'Thigh (in)'};
+  const first=S.body[0],last=S.body[S.body.length-1];
+  return `<div class="banner warn"><b>The scale is context only.</b> Target is to <b>hold ~190</b>.
+    Arms and waist are the scoreboard — a flat weight with arms up and waist down is a win.</div>
+  <div class="card"><h2>New measurement</h2><div class="grid2">
+    ${F.map(f=>`<div><label>${N[f]}</label>
+      <input type="number" step="0.1" id="b_${f}" style="width:100%"></div>`).join('')}</div>
+    <button class="btn" style="width:100%;margin-top:11px" onclick="addBody()">Save measurement</button>
+    <div class="note">Waist at the navel, arms flexed at mid-bicep, same time of day.</div></div>
+  ${first&&last&&first!==last?`<div class="card"><h2>Change since ${first.date}</h2><table>
+    ${F.filter(f=>first[f]&&last[f]).map(f=>{const dv=(last[f]-first[f]).toFixed(1);
+      const good=(f==='waist')?dv<0:(f==='weight'?Math.abs(dv)<5:dv>0);
+      return `<tr><td>${N[f]}</td><td>${first[f]} → <b>${last[f]}</b></td>
+        <td class="${good?'good':'warnc'}">${dv>0?'+':''}${dv}</td></tr>`;}).join('')}
+    </table></div>`:''}
+  ${S.body.length>=2?`<div class="card"><h2>Trends</h2>
+    <div class="sub">One measure per chart — arms and waist move on different scales.</div>
+    <div class="smul">
+    ${[['weight','Weight (lb)','lb',190],['waist','Waist (in)','in',null],
+       ['arm','Arms, avg (in)','in',null],['chest','Chest (in)','in',null],
+       ['thigh','Thigh (in)','in',null]].map(([f,title,unit,tgt])=>{
+      const pts=S.body.map(r=>{
+        const v=(f==='arm')?((r.armL&&r.armR)?(r.armL+r.armR)/2:(r.armL||r.armR)):r[f];
+        return v?{d:r.date,v}:null;}).filter(Boolean);
+      if(pts.length<2)return '';
+      return `<div><h3>${title}</h3>${svgLine(pts,{unit,title,
+        target:tgt,targetLabel:tgt?'hold '+tgt:null})}</div>`;
+    }).join('')||'<div class="note dim">Two measurements needed before trends appear.</div>'}
+    </div>
+    <div class="note">⭐ Arms up and waist down with a flat weight is the win condition.
+      The 190 line on the weight chart is a <b>hold</b> target, not a goal to beat.</div></div>`:''}
+  <div class="card"><h2>History</h2><table><tr><th>Date</th>${F.map(f=>`<th>${f}</th>`).join('')}</tr>
+    ${b.map(r=>`<tr><td>${r.date}</td>${F.map(f=>`<td>${r[f]||'—'}</td>`).join('')}</tr>`).join('')||
+     '<tr><td colspan="7" class="dim">No measurements yet — this is the missing baseline.</td></tr>'}
+  </table></div>`;
+}
+function addBody(){const r={date:today()};let any=false;
+  ['weight','waist','armL','armR','chest','thigh'].forEach(f=>{
+    const v=parseFloat(($('#b_'+f)||{}).value);if(!isNaN(v)){r[f]=v;any=true;}});
+  if(!any){alert('Enter at least one value.');return;}
+  S.body.push(r);save();render();}
+
+/* ---------- HISTORY ---------- */
+function vHist(){
+  const byEx={};
+  S.sessions.forEach(s=>s.entries.forEach(e=>{(byEx[e.id]=byEx[e.id]||[]).push({...e,date:s.date});}));
+  const ids=Object.keys(byEx).sort((a,b)=>LIB[a].name.localeCompare(LIB[b].name));
+  return `<div class="card"><h2>Sessions</h2>
+    <div class="big">${S.sessions.length}</div><div class="sub">logged</div>
+    <table style="margin-top:10px"><tr><th>Date</th><th>Day</th><th>Exercises</th></tr>
+    ${S.sessions.slice().reverse().slice(0,15).map(s=>`<tr><td>${s.date}</td>
+      <td>${s.day} — ${DAYS[s.day].name}</td><td>${s.entries.length}</td></tr>`).join('')||
+      '<tr><td colspan="3" class="dim">No sessions yet.</td></tr>'}</table></div>
+  ${ids.map(id=>{const h=byEx[id],f=h[0],l=h[h.length-1];
+    const d=(f.e1rm&&l.e1rm)?(l.e1rm-f.e1rm).toFixed(1):null;
+    return `<div class="card"><div class="row sp"><h3>${esc(LIB[id].name)}</h3>
+      ${d!==null?`<div class="${d>=0?'good':'bad'}"><b>${d>0?'+':''}${d}</b>
+        <span class="dim" style="font-size:12px"> e1RM</span></div>`:''}</div>
+      ${svgLine(h.filter(e=>e.e1rm).map(e=>({d:e.date,v:e.e1rm})),
+        {unit:'e1RM',title:LIB[id].name+' estimated 1RM',
+         empty:'Two sessions needed before this charts.'})}
+      <table><tr><th>Date</th><th>Load</th><th>Reps</th><th>e1RM</th></tr>
+      ${h.slice().reverse().slice(0,6).map(e=>`<tr><td>${e.date}</td>
+        <td>${e.load==='BW'?'BW':e.load+' lb'}</td><td>${e.reps.join('·')}</td>
+        <td>${e.e1rm||'—'}</td></tr>`).join('')}</table>
+      <div class="note">e1RM rising at the same weight is still progress — that's the point.</div></div>`;
+  }).join('')}`;
+}
+
+/* ---------- SETTINGS ---------- */
+function vSet(){const s=S.settings;return `
+  <div class="card"><h2>Phase</h2>
+    <div class="row sp"><div><b>Phase 0 (weeks 1–2)</b>
+      <div class="note">Engine paused · one fewer set · stop 3–4 reps short of failure.</div></div>
+      <button class="btn ${s.phase0?'':'sec'} sm" onclick="S.settings.phase0=!S.settings.phase0;save();render()">
+        ${s.phase0?'ON':'OFF'}</button></div>
+    <div class="note">Started ${s.startDate} · now week ${weekOf(today())}.
+      ${weekOf(today())>=3&&s.phase0?'<b class="warnc"> Week 3+ — time to turn this off.</b>':''}</div></div>
+
+  <div class="card"><h2>Targets</h2>
+    <div class="grid2">
+      <div><label>Protein (g/day)</label><input type="number" value="${s.proteinTarget}"
+        style="width:100%" onchange="S.settings.proteinTarget=+this.value;save()"></div>
+      <div><label>Water (oz/day)</label><input type="number" value="${s.waterTarget}"
+        style="width:100%" onchange="S.settings.waterTarget=+this.value;save()"></div></div>
+    <div class="note">⚠ Protein defaults to 100 g — a holding value pending the kidney retest,
+      not the 170–190 g muscle target.</div></div>
+
+  <div class="card"><h2>Equipment</h2>
+    <label>Dumbbell pairs owned (lb, comma separated)</label>
+    <input value="${s.dbs.join(',')}" style="width:100%"
+      onchange="S.settings.dbs=this.value.split(',').map(x=>+x.trim()).filter(x=>x>0);save();render()">
+    <div class="note">Add 30, 35 here when you buy them — progression picks them up automatically.</div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn ${s.pullupBar?'':'sec'} sm" onclick="S.settings.pullupBar=!S.settings.pullupBar;save();render()">
+        Pull-up bar: ${s.pullupBar?'YES':'no'}</button>
+      <button class="btn ${s.bands?'':'sec'} sm" onclick="S.settings.bands=!S.settings.bands;save();render()">
+        Bands: ${s.bands?'YES':'no'}</button></div>
+    ${s.pullupBar?'<div class="note good">✅ Pull-up bar on — use it as the Day 3 primary; it solves the back bottleneck.</div>':
+      '<div class="note">A $30 pull-up bar is the single highest-value addition. Wait for the buy trigger to fire.</div>'}</div>
+
+  <div class="card"><h2>Data</h2>
+    <div class="row"><button class="btn sec sm" onclick="exportJSON()">Download backup</button>
+      <button class="btn sec sm" onclick="copyMD()">Copy summary for vault</button></div>
+    <details><summary>Restore from backup</summary>
+      <textarea id="imp" rows="4" placeholder="paste backup JSON"></textarea>
+      <button class="btn sec sm" onclick="importJSON()">Restore</button></details>
+    <details><summary class="bad">Reset everything</summary>
+      <button class="btn sec sm" style="margin-top:7px" onclick="if(confirm('Erase all data?')){localStorage.removeItem(KEY);location.reload()}">
+        Erase all data</button></details>
+    <div class="note">Data lives in this browser only. Download a backup into
+      <code>06 Attachments/</code> now and then.</div></div>
+
+  <div class="card"><h2>The rules, short version</h2>
+    <div class="note">
+      • Sets 1…N−1 stop at target. <b>Final set goes to failure.</b><br>
+      • R ≤ T−3 → load down · R = T−2/−1 → hold · R = T/T+1 → +1 · R = T+2/+3 → +2 · R ≥ T+4 → load up<br>
+      • Top of range + max load → technique rung, then the buy trigger<br>
+      • Missing target on 2+ working sets → hold, drop a set, check protein and sleep<br>
+      • Every 6th week is a deload<br>
+      • Compounds: stop at <i>technical</i> failure. Isolation: true failure is fine.</div></div>`;
+}
+function exportJSON(){const b=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);
+  a.download='health-tracker-'+today()+'.json';a.click();}
+function importJSON(){try{S=Object.assign(JSON.parse(JSON.stringify(BLANK)),JSON.parse($('#imp').value));
+  save();alert('Restored.');render();}catch(e){alert('Bad JSON.');}}
+function copyMD(){
+  const l=S.sessions.slice(-8).map(s=>`| ${s.date} | ${s.day} ${DAYS[s.day].name} | `+
+    s.entries.map(e=>`${e.name} ${e.load==='BW'?'BW':e.load+'lb'}×${e.reps.join('/')}`).join('; ')+' |').join('\n');
+  const b=S.body.slice(-5).map(r=>`| ${r.date} | ${r.weight||'—'} | ${r.waist||'—'} | ${r.armL||'—'}/${r.armR||'—'} |`).join('\n');
+  const t=`## Health Tracker export — ${today()}\n\n### Sessions\n| Date | Day | Work |\n|---|---|---|\n${l}\n\n### Body\n| Date | Weight | Waist | Arms L/R |\n|---|---|---|---|\n${b}\n`;
+  navigator.clipboard.writeText(t).then(()=>alert('Markdown copied — paste into 05 Log/'),()=>{
+    prompt('Copy this:',t);});
+}
+
+render();
+
+/* PWA: register the offline worker (https or localhost only). */
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+</script>
+</body>
+</html>
