@@ -6,7 +6,11 @@
    NOTE: your training data lives in localStorage on the device.
    This cache only holds the app files. Clearing it never touches your log. */
 
-const VERSION = 'ht-v1';
+/* Bump VERSION on every release. The fetch strategy below is cache-first, so without a
+   bump the first launch after a deploy still serves the OLD app and only refreshes in the
+   background — the update would not appear until the second launch. Changing this file is
+   what triggers install -> re-fetch shell -> activate -> delete the stale cache. */
+const VERSION = 'ht-v2';   // 2026-11-23: pull-up movements, 150 g protein floor, program-clock fix
 const SHELL = [
   './',
   './index.html',
