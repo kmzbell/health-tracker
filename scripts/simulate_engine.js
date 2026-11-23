@@ -9,7 +9,7 @@ global.localStorage={_v:{},getItem(k){return this._v[k]||null},setItem(k,v){this
 global.document={querySelector:()=>fake,querySelectorAll:()=>[],addEventListener:()=>{},getElementById:()=>fake};
 global.window={scrollTo:()=>{},addEventListener:()=>{}};
 global.alert=()=>{};
-const api=new Function(code+'\n;return {LIB,engine,weekOf,progStart,S,DAYS,avail,e1rm,syncExercise};')();
+const api=new Function(code+'\n;return {LIB,engine,weekOf,progStart,S,DAYS,avail,e1rm,syncExercise,parseImport,applyImport,getS:()=>S};')();
 const {LIB,engine,weekOf,progStart,S}=api;
 
 let fail=0;
@@ -116,6 +116,41 @@ d1.T=res.T;d1.load=res.load;d1.rung=res.rung;api.syncExercise(d1);
 ok(S.prog[4][0].load===d1.load&&S.prog[4][0].T===d1.T,
    'Day 4 copy of the same movement inherits Day 1 result (was still prescribing 25 lb)');
 ok(S.prog[4][1].load===10,'sync does not touch a different movement');
+
+/* ---- 9. RESTORE: the import path Kevin could not find, now validated ---- */
+const LOG="C:/Users/Kevin/Desktop/Kevin's AI Brain/Kevin's Operating System/03 Projects/Health/05 Log/";
+const raw=fs.readFileSync(LOG+'health-tracker-2026-11-23.json','utf8');
+const fixed=fs.readFileSync(LOG+'health-tracker-CORRECTED-2026-11-23.json','utf8');
+
+ok(api.parseImport(raw).ok,'real export parses');
+ok(api.parseImport(fixed).ok,'corrected export parses');
+ok(/1 session \(latest 2026-11-23\)/.test(api.parseImport(fixed).summary),
+   'summary names what is in the file: '+api.parseImport(fixed).summary);
+ok(/Phase 0 ON/.test(api.parseImport(fixed).summary),'summary surfaces Phase 0 state before overwriting');
+ok(!api.parseImport('not json').ok,'garbage text rejected, does not throw');
+ok(!api.parseImport('[1,2,3]').ok,'array rejected');
+ok(!api.parseImport('{"foo":1}').ok,'unrelated JSON rejected (wrong file)');
+ok(!api.parseImport('null').ok,'null rejected');
+
+/* applying the corrected file must land the fixes.
+   NOTE: applyImport REBINDS the module-level S, so read it through getS() —
+   a reference captured before the import points at the old object. */
+api.applyImport(JSON.parse(fixed));
+const R=api.getS();
+ok(R.settings.phase0===true,'restore lands Phase 0 ON');
+ok(R.settings.proteinTarget===150,'restore lands the 150 g floor');
+ok(R.sessions.length===1,'restore keeps the logged session');
+ok(R.body[0].armR===12,'restore keeps the tape, including armR 12');
+const day1=R.prog['1'];
+ok(day1.find(x=>x.id==='skullcrusher').load===10,'restore lands skull crusher at 10 lb (was stuck at 15)');
+ok(day1.find(x=>x.id==='pushup').T===8,'restore lands push-up target 8 (was stuck at 10)');
+ok(day1.reduce((a,b)=>a+b.sets,0)===13,'restore lands the Phase 0 volume cut (13 sets, was 18)');
+ok(R.prog['4'].find(x=>x.id==='tricepext').load===20,'Day 4 tricep ext inherited 20 lb');
+ok(day1.every(x=>x.setsFull),'setsFull preserved so volume can be restored on 2026-12-07');
+
+/* a backup with no prog must not leave the app with an empty program */
+api.applyImport({settings:{},sessions:[],body:[],fuel:{}});
+ok(Object.keys(api.getS().prog).length===4,'backup missing prog rebuilds the default program');
 
 console.log(fail?('\n'+fail+' FAILURE(S)'):'\nALL PASS');
 process.exit(fail?1:0);

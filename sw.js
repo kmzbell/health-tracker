@@ -10,7 +10,7 @@
    bump the first launch after a deploy still serves the OLD app and only refreshes in the
    background — the update would not appear until the second launch. Changing this file is
    what triggers install -> re-fetch shell -> activate -> delete the stale cache. */
-const VERSION = 'ht-v3';   // 2026-11-23b: material-miss threshold, cross-day load sync
+const VERSION = 'ht-v4';   // 2026-11-23c: visible file-picker restore
 const SHELL = [
   './',
   './index.html',

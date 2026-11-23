@@ -54,6 +54,12 @@ button,select,input{font-family:inherit;font-size:15px}
 input,select{background:var(--panel2);border:1px solid var(--line);color:var(--tx);
   border-radius:8px;padding:9px}
 input[type=number]{width:72px;text-align:center;font-weight:700;font-size:17px}
+/* The native file-picker button renders dark-on-dark against this theme, which is
+   how a visible control still reads as "there is no button here." Style it like a .btn. */
+input[type=file]{padding:7px}
+input[type=file]::file-selector-button{font-family:inherit;font-size:14px;font-weight:700;
+  background:var(--accent);color:#06121f;border:0;border-radius:7px;padding:9px 13px;
+  margin-right:10px;cursor:pointer}
 label{font-size:12px;color:var(--dim);display:block;margin-bottom:3px}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th,td{text-align:left;padding:7px 5px;border-bottom:1px solid var(--line)}
@@ -811,9 +817,14 @@ function vSet(){const s=S.settings;return `
   <div class="card"><h2>Data</h2>
     <div class="row"><button class="btn sec sm" onclick="exportJSON()">Download backup</button>
       <button class="btn sec sm" onclick="copyMD()">Copy summary for vault</button></div>
-    <details><summary>Restore from backup</summary>
+    <h3 style="margin:14px 0 6px">Restore from a backup</h3>
+    <div class="note">Pick the <code>.json</code> file you downloaded. This <b>replaces</b> everything
+      currently in this browser.</div>
+    <input type="file" id="impFile" accept="application/json,.json" style="width:100%;margin-top:8px"
+      onchange="importFile(this)">
+    <details style="margin-top:8px"><summary>or paste the JSON instead</summary>
       <textarea id="imp" rows="4" placeholder="paste backup JSON"></textarea>
-      <button class="btn sec sm" onclick="importJSON()">Restore</button></details>
+      <button class="btn sec sm" onclick="importJSON()">Restore from pasted text</button></details>
     <details><summary class="bad">Reset everything</summary>
       <button class="btn sec sm" style="margin-top:7px" onclick="if(confirm('Erase all data?')){localStorage.removeItem(KEY);location.reload()}">
         Erase all data</button></details>
@@ -832,8 +843,57 @@ function vSet(){const s=S.settings;return `
 function exportJSON(){const b=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(b);
   a.download='health-tracker-'+today()+'.json';a.click();}
-function importJSON(){try{S=Object.assign(JSON.parse(JSON.stringify(BLANK)),JSON.parse($('#imp').value));
-  save();alert('Restored.');render();}catch(e){alert('Bad JSON.');}}
+/* Restore. Two entry points — a FILE PICKER (the common case: Kevin downloads a backup,
+   so what he has is a file, not clipboard text) and a paste box as the fallback.
+   Before 2026-11-23 only the paste box existed, collapsed inside a <details>, so there
+   was no visible Restore control at all and the only route was pasting 5 KB of JSON on
+   a phone. Reported by Kevin: "I'm not seeing a restore button in the app."  */
+
+/* Validate before overwriting. Returns {ok, data, summary} — never throws. */
+function parseImport(text){
+  let d;
+  try{ d=JSON.parse(text); }catch(e){ return {ok:false, summary:'That file is not valid JSON.'}; }
+  if(!d || typeof d!=='object' || Array.isArray(d))
+    return {ok:false, summary:'That JSON is not a tracker backup (expected an object).'};
+  const has=['settings','prog','sessions','body','fuel'].filter(k=>k in d);
+  if(!has.length)
+    return {ok:false, summary:'That JSON has none of the tracker keys (settings, prog, sessions, body, fuel). Wrong file?'};
+  const ns=Array.isArray(d.sessions)?d.sessions.length:0;
+  const nb=Array.isArray(d.body)?d.body.length:0;
+  const last=ns?d.sessions[d.sessions.length-1].date:null;
+  return {ok:true, data:d, summary:
+    ns+' session'+(ns===1?'':'s')+(last?' (latest '+last+')':'')+
+    ' · '+nb+' body measurement'+(nb===1?'':'s')+
+    (d.settings?' · protein target '+d.settings.proteinTarget+' g · Phase 0 '+(d.settings.phase0?'ON':'off'):'')};
+}
+
+function applyImport(d){
+  S=Object.assign(JSON.parse(JSON.stringify(BLANK)),d);
+  if(!S.prog||!Object.keys(S.prog).length)initProg(S);
+  save();render();
+}
+
+function restoreFrom(text){
+  const r=parseImport(text);
+  if(!r.ok){alert(r.summary);return;}
+  const cur=(S.sessions||[]).length;
+  var NL=String.fromCharCode(10);   /* literal newlines, not escapes — keeps this file edit-safe */
+  if(!confirm('Restore this backup?'+NL+NL+r.summary+NL+NL+
+      'This REPLACES the '+cur+' session'+(cur===1?'':'s')+' currently in this browser.')) return;
+  applyImport(r.data);
+  alert('Restored.'+NL+NL+r.summary);
+}
+
+function importFile(inp){
+  const f=inp.files&&inp.files[0];
+  if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{ restoreFrom(String(rd.result)); inp.value=''; };
+  rd.onerror=()=>{ alert('Could not read that file.'); inp.value=''; };
+  rd.readAsText(f);
+}
+
+function importJSON(){ restoreFrom(($('#imp')||{}).value||''); }
 function copyMD(){
   const l=S.sessions.slice(-8).map(s=>`| ${s.date} | ${s.day} ${DAYS[s.day].name} | `+
     s.entries.map(e=>`${e.name} ${e.load==='BW'?'BW':e.load+'lb'}×${e.reps.join('/')}`).join('; ')+' |').join('\n');
