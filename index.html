@@ -276,6 +276,19 @@ const DAYS={
 };
 
 /* ---------- STATE ---------- */
+const BUILD='2026-11-23d';   /* shown in Settings. Bump with every deploy. */
+let SWREG=null;
+
+/* Manual update check, for when the automatic one is not believed. */
+function checkUpdate(){
+  if(!SWREG){alert('Build '+BUILD+String.fromCharCode(10)+String.fromCharCode(10)+'No service worker registered — you are loading straight from the network, so this is already the latest build.');return;}
+  SWREG.update().then(()=>{
+    const w=SWREG.installing||SWREG.waiting;
+    if(w){alert('An update is downloading. The app will reload itself when it is ready.');}
+    else{alert('Build '+BUILD+String.fromCharCode(10)+String.fromCharCode(10)+'You are up to date.');}
+  }).catch(()=>alert('Could not check — no connection?'));
+}
+
 const BLANK={
   settings:{dbs:[5,10,15,20,25],pullupBar:false,bands:false,phase0:true,
             proteinTarget:150,waterTarget:100,labBooked:true,startDate:today()},
@@ -829,7 +842,11 @@ function vSet(){const s=S.settings;return `
       <button class="btn sec sm" style="margin-top:7px" onclick="if(confirm('Erase all data?')){localStorage.removeItem(KEY);location.reload()}">
         Erase all data</button></details>
     <div class="note">Data lives in this browser only. Download a backup into
-      <code>06 Attachments/</code> now and then.</div></div>
+      <code>06 Attachments/</code> now and then.</div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn sec sm" onclick="checkUpdate()">Check for update</button></div>
+    <div class="note">Build <b>${BUILD}</b>. ⛔ <b>Never use the browser's "clear site data" to force an
+      update — that erases your log.</b> This button, or just closing and reopening the app, is enough.</div></div>
 
   <div class="card"><h2>The rules, short version</h2>
     <div class="note">
@@ -906,8 +923,30 @@ function copyMD(){
 render();
 
 /* PWA: register the offline worker (https or localhost only). */
+/* ---------- UPDATES ----------
+   Kevin ran a stale build on 2026-11-23 and the only symptom was an error message
+   that no longer existed in the current code. Two things fix that permanently:
+   a visible BUILD string, and a reload when a new worker takes over. */
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js').then(reg=>{
+      SWREG=reg;
+      reg.update().catch(()=>{});
+      /* check again whenever he returns to the app */
+      document.addEventListener('visibilitychange',()=>{
+        if(!document.hidden)reg.update().catch(()=>{});
+      });
+    }).catch(()=>{});
+
+    /* A new worker took control -> the page is running old code. Reload once.
+       Only when a controller ALREADY existed, so a first-ever visit does not reload. */
+    const had=!!navigator.serviceWorker.controller;
+    let refreshing=false;
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{
+      if(!had||refreshing)return;
+      refreshing=true;location.reload();
+    });
+  });
 }
 </script>
 </body>
