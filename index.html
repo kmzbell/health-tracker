@@ -130,13 +130,19 @@ textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:
    Engine spec: 03 Projects/Health/02 Training/(C) The Program...
    ============================================================ */
 const KEY='kz_health_v1';
+/* Bodyweight pull-up progression: topping the rep range means GRADUATING to the next
+   harder variation, not adding a tempo rung. Ordered easiest → hardest. */
+const BAR_CHAIN=['scappullup','chairpullup','negpullup','chinup','neutralpullup','pullup'];
+function nextVariation(id){const i=BAR_CHAIN.indexOf(id);return (i>=0&&i<BAR_CHAIN.length-1)?BAR_CHAIN[i+1]:null;}
 const RUNGS=['Standard','3-sec eccentric','2-sec pause','1.5 reps','Lengthened partials','Rest-pause'];
 
 /* ---------- EXERCISE LIBRARY — from Kevin's 3 QuickFit posters ----------
    ref = which poster + section, so he can find the picture on the wall.
    [id, name, group, ref, lo, hi, unilateral, bodyweight]                  */
 const LIB={};
-function L(id,name,group,ref,lo,hi,uni,bw){LIB[id]={id,name,group,ref,lo,hi,uni:!!uni,bw:!!bw};}
+function L(id,name,group,ref,lo,hi,uni,bw,req){LIB[id]={id,name,group,ref,lo,hi,uni:!!uni,bw:!!bw,req:req||null};}
+/* req = equipment gate: 'pullupBar' | 'bands'. Hidden from swap lists until the toggle is on. */
+function avail(x){return !x.req || !!S.settings[x.req];}
 
 /* CHEST */
 L('benchpress','Bench Press','chest','V1 · Upper',8,15);
@@ -161,6 +167,19 @@ L('deadrow','Dead Row','back','V3 · Back',10,18);
 L('widerow','Wide Row','back','V3 · Back',12,20);
 L('sareversefly','Single Arm Reverse Fly','back','V3 · Back',15,25,1);
 L('superman','Superman','back','V3 · Back',12,20,0,1);
+/* PULL-UP BAR — added 2026-11-23 when the bar arrived. All bodyweight, all gated on
+   settings.pullupBar. Ordered easiest → hardest; start at the top of this list, not the bottom.
+   Rep ranges are deliberately low: 190 lb, detrained, four months under-fuelled. */
+L('deadhang','Dead Hang (seconds)','back','— bar · grip/decompress',15,60,0,1,'pullupBar');
+L('scappullup','Scapular Pull-Up','back','— bar · step 1',5,12,0,1,'pullupBar');
+L('chairpullup','Chair-Assisted Pull-Up','back','— bar · step 2',5,12,0,1,'pullupBar');
+L('negpullup','Negative Pull-Up (5s lower)','back','— bar · step 3',3,8,0,1,'pullupBar');
+L('bandpullup','Band-Assisted Pull-Up','back','— bar + bands',5,12,0,1,'bands');
+L('chinup','Chin-Up (underhand)','back','— bar · step 4',2,8,0,1,'pullupBar');
+L('neutralpullup','Neutral-Grip Pull-Up','back','— bar · step 4',2,8,0,1,'pullupBar');
+L('pullup','Pull-Up (overhand)','back','— bar · step 5',1,8,0,1,'pullupBar');
+L('invertedrow','Inverted Row (bar at hip height)','back','— bar · horizontal',8,15,0,1,'pullupBar');
+L('hangkneeraise','Hanging Knee Raise','core','— bar',6,15,0,1,'pullupBar');
 L('pullover','Dumbbell Pullover','back','V1 · Upper',12,18);
 L('reversefly','Reverse Fly','back','V1 · Upper',15,25);
 L('shrug','Shoulder Shrug','back','V1 · Upper',15,22);
@@ -253,7 +272,7 @@ const DAYS={
 /* ---------- STATE ---------- */
 const BLANK={
   settings:{dbs:[5,10,15,20,25],pullupBar:false,bands:false,phase0:true,
-            proteinTarget:100,waterTarget:100,labBooked:false,startDate:today()},
+            proteinTarget:150,waterTarget:100,labBooked:true,startDate:today()},
   prog:{}, sessions:[], fuel:{}, body:[]
 };
 let S=load();
@@ -273,7 +292,7 @@ function stepDown(w){const a=dbs();const i=a.indexOf(w);return i>0?a[i-1]:null;}
 
 function engine(p,reps){
   const ex=LIB[p.id], T=p.T, R=reps[reps.length-1], prior=reps.slice(0,-1);
-  const out={T:p.T,load:p.load,rung:p.rung||0,msgs:[],flag:null};
+  const out={T:p.T,load:p.load,rung:p.rung||0,id:p.id,msgs:[],flag:null};
   if(S.settings.phase0){out.msgs.push('Phase 0 — engine paused, nothing adjusted.');return out;}
   const bw=(p.load==='BW'), d=R-T;
   const missed=prior.filter(r=>r<T).length;
@@ -313,12 +332,18 @@ function engine(p,reps){
   // Top of range reached
   if(out.T>ex.hi){
     const up=bw?null:stepUp(out.load);
+    const nv=bw?nextVariation(p.id):null;
     if(up&&d>=2){out.load=up;out.T=ex.lo;out.msgs.push('Top of rep range — load up to '+up+' lb, reps reset.');}
+    else if(nv&&d>=2){
+      out.id=nv;out.T=LIB[nv].lo;out.rung=0;out.flag='graduate';
+      out.msgs.push('⭐ GRADUATED — topped the rep range. Next session is '+LIB[nv].name+', '+LIB[nv].lo+' reps.');}
     else if(!up){
       if(out.rung<RUNGS.length-1){out.rung++;out.T=ex.lo;
-        out.msgs.push('🔧 At max load and top of range → technique rung: '+RUNGS[out.rung]+'. Reps reset to '+ex.lo+'.');}
+        out.msgs.push('🔧 '+(bw?'Top of range on the hardest variation':'At max load and top of range')+' → technique rung: '+RUNGS[out.rung]+'. Reps reset to '+ex.lo+'.');}
       else{out.T=ex.hi;out.flag='outgrown';
-        out.msgs.push('⭐ BUY TRIGGER — max load, top of range, ladder exhausted. This exercise has outgrown the equipment.');}
+        out.msgs.push(bw
+          ? '⭐ Top of range, hardest variation, ladder exhausted — start adding weight (loaded backpack), not reps.'
+          : '⭐ BUY TRIGGER — max load, top of range, ladder exhausted. This exercise has outgrown the equipment.');}
     } else out.T=ex.hi;
   }
   return out;
@@ -330,7 +355,17 @@ const $=s=>document.querySelector(s);
 function esc(t){return String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function lastFor(id){for(let i=S.sessions.length-1;i>=0;i--){
   const e=S.sessions[i].entries.find(x=>x.id===id);if(e)return{...e,date:S.sessions[i].date};}return null;}
-function weekOf(ds){const d=new Date(S.settings.startDate),n=new Date(ds);
+/* The program clock starts at the first LOGGED SESSION, not the day the app was installed.
+   Installing on 10/23 and starting on 11/23 was reporting "week 5" with zero sessions logged —
+   which told Kevin to switch Phase 0 off and queued a deload before he had ever trained. */
+function progStart(){
+  if(S.sessions&&S.sessions.length){
+    return S.sessions.reduce((m,x)=>(x.date&&x.date<m?x.date:m),S.sessions[0].date);
+  }
+  return null;
+}
+function weekOf(ds){const st=progStart();if(!st)return 0;
+  const d=new Date(st),n=new Date(ds);
   return Math.floor((n-d)/6048e5)+1;}
 
 /* ============================================================
@@ -460,12 +495,12 @@ function render(){
   const w=S.body.length?S.body[S.body.length-1].weight:null;
   $('#hdrW').textContent=w?w:'—';
   $('#hdr').textContent='Week '+weekOf(today())+(S.settings.phase0?' · ⚠ Phase 0':'')+' · '+today();
+  /* Lab retest came back normal 2026-11-04 — the blocker banner is retired.
+     What survives is the hydration guardrail, which was never conditional on the result. */
   $('#labBanner').innerHTML = S.settings.labBooked?'':
-    `<div class="banner"><b>🔴 LAB RETEST OUTSTANDING.</b><br>
-     Kidney panel needs repeating. Ask for <b>cystatin C</b> alongside creatinine + eGFR — it measures
-     filtration independently of creatine intake and muscle mass.<br>
-     <span class="dim">Protein target here is a holding value, not the muscle-building target. Sauna ramp is suspended.</span><br>
-     <button class="btn sm sec" style="margin-top:8px" onclick="S.settings.labBooked=true;save();render()">Mark retest booked</button></div>`;
+    `<div class="banner"><b>Lab retest done.</b> Protein and sauna are both unblocked — ramp, don't jump.<br>
+     <span class="dim">Hydration rules still stand: water before and after every sauna session.</span><br>
+     <button class="btn sm sec" style="margin-top:8px" onclick="S.settings.labBooked=true;save();render()">Got it</button></div>`;
   $('#view').innerHTML={today:vToday,fuel:vFuel,body:vBody,hist:vHist,set:vSet}[TAB]();
   if(TAB==='today')wireToday();
   wireCharts();
@@ -536,13 +571,22 @@ function exCard(p,i){
     <details><summary>Swap exercise</summary>
       <select onchange="swap(${i},this.value)" style="width:100%;margin-top:7px">
         <option value="">— same muscle group (${ex.group}) —</option>
-        ${Object.values(LIB).filter(x=>x.group===ex.group&&x.id!==ex.id)
+        ${Object.values(LIB).filter(x=>x.group===ex.group&&x.id!==ex.id&&avail(x))
           .map(x=>`<option value="${x.id}">${esc(x.name)} · ${x.ref}</option>`).join('')}
       </select></details></div>`;
 }
 function wireToday(){}
 function swap(i,id){if(!id)return;const p=S.prog[dayPick][i];
   p.id=id;p.T=LIB[id].lo;p.rung=0;save();render();}
+
+/* One-tap: put the bar at the front of Day 3 (Upper Pull) without a rebuild. */
+function setDay3Pull(){
+  const d=S.prog[3]; if(!d){return;}
+  if(d.some(p=>p.id==='negpullup')){alert('Negative Pull-Up is already in Day 3.');return;}
+  d.unshift({id:'negpullup',sets:3,T:LIB['negpullup'].lo,load:'BW',rung:0});
+  save();render();
+  alert('Negative Pull-Up added as the Day 3 primary, 3 sets. Lower for 5 seconds; step or jump back up.');
+}
 
 function saveSession(){
   const d=dayPick,prog=S.prog[d],entries=[],changes=[];
@@ -555,8 +599,9 @@ function saveSession(){
     entries.push({id:p.id,name:ex.name,load:p.load,T:p.T,reps,e1rm:e1rm(p.load,R),rung:p.rung});
     changes.push({name:ex.name,msgs:res.msgs,flag:res.flag,
       from:`${p.load==='BW'?'BW':p.load+' lb'} × ${p.T}`,
-      to:`${res.load==='BW'?'BW':res.load+' lb'} × ${res.T}`});
+      to:`${res.id!==p.id?LIB[res.id].name+' ':''}${res.load==='BW'?'BW':res.load+' lb'} × ${res.T}`});
     p.T=res.T;p.load=res.load;p.rung=res.rung;
+    if(res.id&&res.id!==p.id)p.id=res.id;  /* bodyweight graduation swaps the movement itself */
   }
   if(!entries.length){alert('Enter reps for at least one complete exercise.');return;}
   const note=($('#snote')||{}).value||'';
@@ -601,8 +646,8 @@ function vFuel(){
       `<button class="btn sec sm" onclick="addW(${n})">+${n}</button>`).join('')}
       <button class="btn sec sm" onclick="addW(-8)">−8</button>
       <button class="btn sec sm" onclick="setW(0)">reset</button></div>
-    <div class="note">⚠ Hydration matters more than usual right now — dehydration is one of the
-      leading explanations for the July creatinine.</div></div>
+    <div class="note">⚠ Hydration is a standing rule here, not a suggestion — drink before and after
+      every sauna session, and on training days.</div></div>
 
   <div class="card"><h2>Protein — last 14 days</h2>
     <div class="sub">Green bars cleared the ${pt} g floor.</div>
@@ -706,7 +751,8 @@ function vSet(){const s=S.settings;return `
       <div class="note">Engine paused · one fewer set · stop 3–4 reps short of failure.</div></div>
       <button class="btn ${s.phase0?'':'sec'} sm" onclick="S.settings.phase0=!S.settings.phase0;save();render()">
         ${s.phase0?'ON':'OFF'}</button></div>
-    <div class="note">Started ${s.startDate} · now week ${weekOf(today())}.
+    <div class="note">${progStart()?`Program started <b>${progStart()}</b> (first logged session) · now week ${weekOf(today())}.`
+      :'<b>Week 0 — no sessions logged yet.</b> The clock starts on your first saved session, not on install day.'}
       ${weekOf(today())>=3&&s.phase0?'<b class="warnc"> Week 3+ — time to turn this off.</b>':''}</div></div>
 
   <div class="card"><h2>Targets</h2>
@@ -715,8 +761,11 @@ function vSet(){const s=S.settings;return `
         style="width:100%" onchange="S.settings.proteinTarget=+this.value;save()"></div>
       <div><label>Water (oz/day)</label><input type="number" value="${s.waterTarget}"
         style="width:100%" onchange="S.settings.waterTarget=+this.value;save()"></div></div>
-    <div class="note">⚠ Protein defaults to 100 g — a holding value pending the kidney retest,
-      not the 170–190 g muscle target.</div></div>
+    <div class="note">Floor <b>150 g</b> · target <b>170–190 g</b>. Ramp up over 2–3 weeks rather than
+      jumping — appetite suppression is the only thing in the way now.</div>
+    ${s.proteinTarget<150?`<div class="note warnc">⚠ Target is set to ${s.proteinTarget} g — below the 150 g floor.
+      The old 100 g holding value was tied to the kidney question, and that closed on 2026-11-04.
+      <button class="btn sm" style="margin-top:8px" onclick="S.settings.proteinTarget=150;save();render()">Set to 150 g</button></div>`:''}</div>
 
   <div class="card"><h2>Equipment</h2>
     <label>Dumbbell pairs owned (lb, comma separated)</label>
@@ -728,7 +777,11 @@ function vSet(){const s=S.settings;return `
         Pull-up bar: ${s.pullupBar?'YES':'no'}</button>
       <button class="btn ${s.bands?'':'sec'} sm" onclick="S.settings.bands=!S.settings.bands;save();render()">
         Bands: ${s.bands?'YES':'no'}</button></div>
-    ${s.pullupBar?'<div class="note good">✅ Pull-up bar on — use it as the Day 3 primary; it solves the back bottleneck.</div>':
+    ${s.pullupBar?`<div class="note good">✅ Pull-up bar on — 9 bar movements unlocked in the Swap lists
+      (Back, plus Hanging Knee Raise under Core).<br>
+      <b>Start at Dead Hang / Scapular Pull-Up / Negative Pull-Up</b>, not at a full pull-up — at 190 lb and
+      detrained, a strict rep is not there yet, and the bar's value is that it finally loads your back past 25 lb.
+      <button class="btn sm" style="margin-top:8px" onclick="setDay3Pull()">Make Negative Pull-Up the Day 3 primary</button></div>`:
       '<div class="note">A $30 pull-up bar is the single highest-value addition. Wait for the buy trigger to fire.</div>'}</div>
 
   <div class="card"><h2>Data</h2>
