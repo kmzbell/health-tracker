@@ -295,23 +295,34 @@ function engine(p,reps){
   const out={T:p.T,load:p.load,rung:p.rung||0,id:p.id,msgs:[],flag:null};
   if(S.settings.phase0){out.msgs.push('Phase 0 — engine paused, nothing adjusted.');return out;}
   const bw=(p.load==='BW'), d=R-T;
-  const missed=prior.filter(r=>r<T).length;
+
+  /* A "miss" is a MATERIAL miss (2+ reps short), not one rep short — otherwise normal
+     end-of-set rounding reads as failure. */
+  const missed=prior.filter(r=>r<=T-2).length;
+  /* The threshold scales with how many working sets there ARE. It used to be a hard
+     `missed>=2`, which is UNREACHABLE on a 2-set exercise (only 1 working set exists) —
+     so load could never come down no matter how badly it went. Found 2026-11-23 in
+     Kevin's first real session: skull crushers logged 3 and 2 reps against a target of
+     12 at 15 lb, and the engine held the load. */
+  const failThresh=Math.max(1,Math.ceil(prior.length/2));
 
   /* IMPORTANT: working sets stop AT target, so the final set is the most fatigued.
      A final set below target is NORMAL and must never, on its own, drop the load —
      otherwise loads walk downward while Kevin is actually succeeding.
      Load only comes down when the working sets ALSO failed. */
-  if(missed>=2 && d<=-3){
+  if(missed>=failThresh && d<=-3){
     const dn=bw?null:stepDown(p.load);
     if(dn){out.load=dn;out.T=ex.lo;out.flag='under';
-      out.msgs.push('Genuinely too heavy — missed '+missed+' working sets AND faded badly. Load down to '+dn+' lb.');}
+      out.msgs.push('Genuinely too heavy — missed '+missed+' working set'+(missed>1?'s':'')+' AND faded badly. Load down to '+dn+' lb.');}
     else{out.T=Math.max(ex.lo,T-2);out.flag='under';
-      out.msgs.push('Too heavy at minimum load — target down to '+out.T+'.');}
+      out.msgs.push(bw
+        ? 'Bodyweight is the load — it cannot come down, so the target does: '+out.T+'. If that is still too many, move to an easier variation.'
+        : 'Too heavy at minimum load — target down to '+out.T+'.');}
     return out;
   }
-  if(missed>=2){
+  if(missed>=failThresh){
     out.flag='under';
-    out.msgs.push('⚠ Missed target on '+missed+' working sets but the last set held up. Holding load, drop a set. Check protein and sleep.');
+    out.msgs.push('⚠ Missed target on '+missed+' working set'+(missed>1?'s':'')+' but the last set held up. Holding load, drop a set. Check protein and sleep.');
     return out;
   }
   /* Working sets landed — the load is proven. Only the final set decides direction. */
@@ -588,6 +599,18 @@ function setDay3Pull(){
   alert('Negative Pull-Up added as the Day 3 primary, 3 sets. Lower for 5 seconds; step or jump back up.');
 }
 
+/* One movement = one prescription. Several exercises appear on two days (push-ups and
+   tricep extensions are on Day 1 AND Day 4), and each day used to carry its OWN load.
+   Proving 25 lb too heavy on Day 1 left Day 4 still prescribing 25 lb three days later.
+   After a session, every other day's copy of that movement inherits the new prescription. */
+function syncExercise(src){
+  for(const d in S.prog){
+    for(const q of S.prog[d]){
+      if(q!==src && q.id===src.id){ q.T=src.T; q.load=src.load; q.rung=src.rung; }
+    }
+  }
+}
+
 function saveSession(){
   const d=dayPick,prog=S.prog[d],entries=[],changes=[];
   for(let i=0;i<prog.length;i++){
@@ -602,6 +625,7 @@ function saveSession(){
       to:`${res.id!==p.id?LIB[res.id].name+' ':''}${res.load==='BW'?'BW':res.load+' lb'} × ${res.T}`});
     p.T=res.T;p.load=res.load;p.rung=res.rung;
     if(res.id&&res.id!==p.id)p.id=res.id;  /* bodyweight graduation swaps the movement itself */
+    syncExercise(p);
   }
   if(!entries.length){alert('Enter reps for at least one complete exercise.');return;}
   const note=($('#snote')||{}).value||'';
